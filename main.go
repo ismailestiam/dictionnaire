@@ -12,7 +12,7 @@ func main() {
 	dict.Ajouter("estiam", "ecole")
 	dict.Ajouter("ismail", "etudiant")
 
-	fmt.Println("Obtenir 'estiam':", dict.Obtenir("estiam"))
+	fmt.Println("Get 'estiam':", dict.Get("estiam"))
 
 	dict.Lister()
 
