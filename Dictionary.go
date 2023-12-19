@@ -14,7 +14,7 @@ func (d *Dictionnaire) Ajouter(mot, definition string) {
 	d.data[mot] = definition
 }
 
-func (d *Dictionnaire) Obtenir(mot string) string {
+func (d *Dictionnaire) Get(mot string) string {
 	return d.data[mot]
 }
 
