@@ -4,29 +4,27 @@ import (
 	"fmt"
 )
 
-// Dictionary represents a simple dictionary
-type Dictionary struct {
+type dictionnaire struct {
 	data map[string]string
 }
 
-func NewDictionary() *Dictionary {
-	return &Dictionary{data: make(map[string]string)}
+func NewDictionary() *dictionnaire {
+	return &dictionnaire{data: make(map[string]string)}
 }
 
-func (d *Dictionary) Add(key, value string) {
+func (d *dictionnaire) Add(key, value string) {
 	d.data[key] = value
 }
 
-func (d *Dictionary) Get(key string) string {
+func (d *dictionnaire) Get(key string) string {
 	return d.data[key]
 }
 
-func (d *Dictionary) Remove(key string) {
+func (d *dictionnaire) Remove(key string) {
 	delete(d.data, key)
 }
 
-// List prints all key-value pairs in the dictionary
-func (d *Dictionary) List() {
+func (d *dictionnaire) List() {
 	fmt.Println("Listing key-value pairs:")
 	for key, value := range d.data {
 		fmt.Printf("Key: %s, Value: %s\n", key, value)
@@ -34,16 +32,16 @@ func (d *Dictionary) List() {
 }
 
 func main() {
-	// Using the dictionary methods
+
 	dict := NewDictionary()
 
-	dict.Add("word1", "definition1")
-	dict.Add("word2", "definition2")
+	dict.Add("estiam", "ecole")
+	dict.Add("ismail", "etudiant")
 
-	fmt.Println("Get 'word1':", dict.Get("word1"))
+	fmt.Println("Get 'estiam':", dict.Get("estiam"))
 
 	dict.List()
 
-	dict.Remove("word2")
+	dict.Remove("ismail")
 	dict.List()
 }
