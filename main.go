@@ -3,46 +3,37 @@ package main
 import "fmt"
 
 func main() {
-	// Creating a slice (list) in Go
-	myList := []int{1, 2, 3, 4, 5}
+	m := make(map[string]int)
 
-	// Accessing elements in the list using get function
-	v1 := get(myList, 2)
-	fmt.Println("Element at index 2 (using get):", v1)
+	m["k1"] = 7
+	m["k2"] = 13
 
-	// Modifying an element in the list
-	myList[2] = 10
-	fmt.Println("Updated list:", myList)
+	// Using the custom functions
+	v1 := get(m, "k1")
+	fmt.Println("Value for key 'k1':", v1)
 
-	// Removing an element from the list using remove function
-	myList = remove(myList, 3)
-	fmt.Println("List after removing element at index 3:", myList)
+	lister(m)
 
-	// Appending elements to the list
-	myList = append(myList, 6, 7, 8)
-	fmt.Println("List after appending:", myList)
+	m = remove(m, "k2")
+	lister(m)
+}
 
-	// Iterating through the list
-	fmt.Println("Iterating through the list:")
-	for index, value := range myList {
-		fmt.Printf("Index: %d, Value: %d\n", index, value)
+// hadi katroutrner b key
+func get(m map[string]int, key string) int {
+	return m[key]
+}
+
+// lister les valeurs dyal key
+func lister(m map[string]int) {
+	fmt.Println("Listing key-value pairs:")
+	for key, value := range m {
+		fmt.Printf("Key: %s, Value: %d\n", key, value)
 	}
 }
 
-// get function retrieves an element from the slice at a specified index
-func get(list []int, index int) int {
-	if index >= 0 && index < len(list) {
-		return list[index]
-	}
-	// Return a default value or handle the error as needed
-	return -1
-}
-
-// remove function removes an element from the slice at a specified index
-func remove(list []int, index int) []int {
-	if index >= 0 && index < len(list) {
-		return append(list[:index], list[index+1:]...)
-	}
-	// Return the original slice if index is out of bounds
-	return list
+// supprimer avec key
+func remove(m map[string]int, key string) map[string]int {
+	delete(m, key)
+	fmt.Printf("Removed key '%s' from the map.\n", key)
+	return m
 }
