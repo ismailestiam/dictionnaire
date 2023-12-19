@@ -1,39 +1,49 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+)
 
-func main() {
-	m := make(map[string]int)
-
-	m["k1"] = 7
-	m["k2"] = 13
-
-	// Using the custom functions
-	v1 := get(m, "k1")
-	fmt.Println("Value for key 'k1':", v1)
-
-	lister(m)
-
-	m = remove(m, "k2")
-	lister(m)
+// Dictionary represents a simple dictionary
+type Dictionary struct {
+	data map[string]string
 }
 
-// hadi katroutrner b key
-func get(m map[string]int, key string) int {
-	return m[key]
+func NewDictionary() *Dictionary {
+	return &Dictionary{data: make(map[string]string)}
 }
 
-// lister les valeurs dyal key
-func lister(m map[string]int) {
+func (d *Dictionary) Add(key, value string) {
+	d.data[key] = value
+}
+
+func (d *Dictionary) Get(key string) string {
+	return d.data[key]
+}
+
+func (d *Dictionary) Remove(key string) {
+	delete(d.data, key)
+}
+
+// List prints all key-value pairs in the dictionary
+func (d *Dictionary) List() {
 	fmt.Println("Listing key-value pairs:")
-	for key, value := range m {
-		fmt.Printf("Key: %s, Value: %d\n", key, value)
+	for key, value := range d.data {
+		fmt.Printf("Key: %s, Value: %s\n", key, value)
 	}
 }
 
-// supprimer avec key
-func remove(m map[string]int, key string) map[string]int {
-	delete(m, key)
-	fmt.Printf("Removed key '%s' from the map.\n", key)
-	return m
+func main() {
+	// Using the dictionary methods
+	dict := NewDictionary()
+
+	dict.Add("word1", "definition1")
+	dict.Add("word2", "definition2")
+
+	fmt.Println("Get 'word1':", dict.Get("word1"))
+
+	dict.List()
+
+	dict.Remove("word2")
+	dict.List()
 }
