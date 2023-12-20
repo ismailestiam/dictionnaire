@@ -1,9 +1,11 @@
+// dictionary.go
 package dictionary
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
+	"net/http"
+	"sync"
 )
 
 type Entry struct {
@@ -14,6 +16,7 @@ type Entry struct {
 type Dictionnaire struct {
 	filePath string
 	entries  []Entry
+	mutex    sync.Mutex
 }
 
 func NewDictionnaire(filePath string) *Dictionnaire {
@@ -24,6 +27,9 @@ func NewDictionnaire(filePath string) *Dictionnaire {
 }
 
 func (d *Dictionnaire) loadFromFile() error {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
 	fileData, err := ioutil.ReadFile(d.filePath)
 	if err != nil {
 		return err
@@ -38,6 +44,9 @@ func (d *Dictionnaire) loadFromFile() error {
 }
 
 func (d *Dictionnaire) saveToFile() error {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
 	fileData, err := json.MarshalIndent(d.entries, "", "  ")
 	if err != nil {
 		return err
@@ -51,48 +60,54 @@ func (d *Dictionnaire) saveToFile() error {
 	return nil
 }
 
-func (d *Dictionnaire) Add(mot, definition string) error {
-	err := d.loadFromFile()
-	if err != nil {
-		return err
+// AddEntryHandler handles the HTTP POST request to add an entry to the dictionary.
+func (d *Dictionnaire) AddEntryHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
 	}
 
-	newEntry := Entry{Mot: mot, Definition: definition}
+	var newEntry Entry
+	err := json.NewDecoder(r.Body).Decode(&newEntry)
+	if err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
 	d.entries = append(d.entries, newEntry)
 
 	err = d.saveToFile()
 	if err != nil {
-		return err
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
 	}
 
-	return nil
+	w.WriteHeader(http.StatusCreated)
 }
 
-func (d *Dictionnaire) Get(mot string) (string, error) {
-	err := d.loadFromFile()
-	if err != nil {
-		return "", err
+// RemoveEntryHandler handles the HTTP DELETE request to remove an entry from the dictionary by word.
+func (d *Dictionnaire) RemoveEntryHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
 	}
 
-	for _, entry := range d.entries {
-		if entry.Mot == mot {
-			return entry.Definition, nil
-		}
+	word := r.URL.Query().Get("mot")
+	if word == "" {
+		http.Error(w, "Missing 'mot' parameter", http.StatusBadRequest)
+		return
 	}
 
-	return "", fmt.Errorf("Mot non trouvé : %s", mot)
-}
-
-func (d *Dictionnaire) Remove(mot string) error {
-	err := d.loadFromFile()
-	if err != nil {
-		return err
-	}
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
 
 	var updatedEntries []Entry
 	found := false
 	for _, entry := range d.entries {
-		if entry.Mot == mot {
+		if entry.Mot == word {
 			found = true
 		} else {
 			updatedEntries = append(updatedEntries, entry)
@@ -100,29 +115,35 @@ func (d *Dictionnaire) Remove(mot string) error {
 	}
 
 	if !found {
-		return fmt.Errorf("Mot non trouvé : %s", mot)
+		http.Error(w, "Mot non trouvé", http.StatusNotFound)
+		return
 	}
 
 	d.entries = updatedEntries
 
-	err = d.saveToFile()
+	err := d.saveToFile()
 	if err != nil {
-		return err
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
 	}
 
-	return nil
+	w.WriteHeader(http.StatusNoContent)
 }
 
-func (d *Dictionnaire) List() error {
+// ListEntriesHandler handles the HTTP GET request to list all entries in the dictionary.
+func (d *Dictionnaire) ListEntriesHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	err := d.loadFromFile()
 	if err != nil {
-		return err
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
 	}
 
-	fmt.Println("Listing key-value pairs:")
-	for _, entry := range d.entries {
-		fmt.Printf("Mot: %s, Definition: %s\n", entry.Mot, entry.Definition)
-	}
-
-	return nil
+	response, _ := json.Marshal(d.entries)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(response)
 }
