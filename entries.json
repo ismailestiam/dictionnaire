@@ -1,22 +1,17 @@
 [
-  {
-    "mot": "ordinateur",
-    "definition": "une machine qui traite des informations"
-  },
-  {
-    "mot": "pluie",
-    "definition": "de l'eau qui tombe du ciel"
-  },
-  {
-    "mot": "golang",
-    "definition": "un langage de programmation"
-  },
-  {
-    "mot": "montagne",
-    "definition": "une élévation naturelle et élevée du sol"
-  },
-  {
-    "mot": "mot2",
-    "definition": "definition2"
-  }
+    {
+        "Python": "Python is a programming language"
+    },
+    {
+        "Go": "Go is a programming language"
+    },
+    {
+        "Node": "Node is a programming language"
+    },
+    {
+        "C++": "C++ is a programming language"
+    },
+    {
+        "VB.Net": "VB.Net is a programming language"
+    }
 ]
