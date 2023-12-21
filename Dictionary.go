@@ -1,149 +1,265 @@
-// dictionary.go
-package dictionary
+package dict
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
-	"sync"
+	"os"
+	"sort"
 )
 
-type Entry struct {
-	Mot        string `json:"mot"`
-	Definition string `json:"definition"`
-}
-
-type Dictionnaire struct {
+type Dict struct {
+	entries  map[string]string
 	filePath string
-	entries  []Entry
-	mutex    sync.Mutex
 }
 
-func NewDictionnaire(filePath string) *Dictionnaire {
-	return &Dictionnaire{
-		filePath: filePath,
-		entries:  nil,
+func removeDuplicates(elements []string) []string {
+	encountered := make(map[string]bool)
+	result := []string{}
+
+	for _, element := range elements {
+		if !encountered[element] {
+			encountered[element] = true
+			result = append(result, element)
+		}
 	}
+	return result
 }
 
-func (d *Dictionnaire) loadFromFile() error {
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
-
-	fileData, err := ioutil.ReadFile(d.filePath)
-	if err != nil {
-		return err
-	}
-
-	err = json.Unmarshal(fileData, &d.entries)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (d *Dictionnaire) saveToFile() error {
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
-
-	fileData, err := json.MarshalIndent(d.entries, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	err = ioutil.WriteFile(d.filePath, fileData, 0644)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// AddEntryHandler handles the HTTP POST request to add an entry to the dictionary.
-func (d *Dictionnaire) AddEntryHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var newEntry Entry
-	err := json.NewDecoder(r.Body).Decode(&newEntry)
-	if err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
-
-	d.entries = append(d.entries, newEntry)
-
-	err = d.saveToFile()
-	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusCreated)
-}
-
-// RemoveEntryHandler handles the HTTP DELETE request to remove an entry from the dictionary by word.
-func (d *Dictionnaire) RemoveEntryHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodDelete {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	word := r.URL.Query().Get("mot")
-	if word == "" {
-		http.Error(w, "Missing 'mot' parameter", http.StatusBadRequest)
-		return
-	}
-
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
-
-	var updatedEntries []Entry
-	found := false
-	for _, entry := range d.entries {
-		if entry.Mot == word {
-			found = true
-		} else {
-			updatedEntries = append(updatedEntries, entry)
+func sortDictByKey(anyDictList []map[string]string) []map[string]string {
+	var keys []string
+	var sortList []map[string]string
+	for _, anyDict := range anyDictList {
+		for key := range anyDict {
+			keys = append(keys, key)
 		}
 	}
 
-	if !found {
-		http.Error(w, "Mot non trouvé", http.StatusNotFound)
-		return
+	// Remove duplicate keys
+	keys = removeDuplicates(keys)
+
+	// Sort the keys
+	sort.Strings(keys)
+
+	// Create the sorted list of maps
+	for _, key := range keys {
+		for _, anyDict := range anyDictList {
+			if value, ok := anyDict[key]; ok {
+				myMap := map[string]string{key: value}
+				sortList = append(sortList, myMap)
+			}
+		}
 	}
-
-	d.entries = updatedEntries
-
-	err := d.saveToFile()
-	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusNoContent)
+	return sortList
 }
 
-// ListEntriesHandler handles the HTTP GET request to list all entries in the dictionary.
-func (d *Dictionnaire) ListEntriesHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+func createFile() (string, bool) {
+	filePath := "dict.json"
+	var isFileCreate = false
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		file, err := os.Create(filePath)
+		if err != nil {
+			fmt.Println("Erreur lors de la creation du fichier", err)
+		} else {
+			isFileCreate = true
+		}
+		defer file.Close()
 	}
+	return filePath, isFileCreate
+}
 
-	err := d.loadFromFile()
+func Init() Dict {
+	filePath, _ := createFile()
+	d := Dict{entries: make(map[string]string), filePath: filePath}
+	return d
+}
+
+func (anyDict *Dict) Add(key, value string) string {
+	var message string = ""
+	var dataSlice []map[string]string
+	jsonContent, err := ioutil.ReadFile(anyDict.filePath)
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		message = "Error reading file: " + err.Error()
+	}
+
+	_ = json.Unmarshal(jsonContent, &dataSlice)
+
+	my_map := map[string]string{key: value}
+	dataSlice = append(dataSlice, my_map)
+
+	data, _ := json.MarshalIndent(dataSlice, "", "  ")
+	err = os.WriteFile(anyDict.filePath, data, 0644)
+	if err != nil {
+		message = err.Error()
+	} else {
+		message = "Add successfully"
+	}
+	return message
+}
+
+func (anyDict *Dict) Get(word string) string {
+	var dataMaps []map[string]string
+	var wordFind string = "Element not found"
+	jsonContent, _ := ioutil.ReadFile(anyDict.filePath)
+	_ = json.Unmarshal(jsonContent, &dataMaps)
+
+	for _, aMap := range dataMaps {
+		for key, value := range aMap {
+			if word == key {
+				wordFind = word + " : " + value
+				break
+			}
+		}
+	}
+	return wordFind
+}
+
+func (anyDict *Dict) Remove(key string) string {
+	jsonContent, _ := ioutil.ReadFile(anyDict.filePath)
+	var data []map[string]string
+	isRemove := false
+	var message string = ""
+	_ = json.Unmarshal(jsonContent, &data)
+	for i := len(data) - 1; i >= 0; i-- {
+		if _, ok := data[i][key]; ok {
+			data = append(data[:i], data[i+1:]...)
+			isRemove = true
+		}
+	}
+
+	if isRemove {
+		updatedData, _ := json.MarshalIndent(data, "", "    ")
+		err := ioutil.WriteFile(anyDict.filePath, updatedData, 0644)
+		if err != nil {
+			message = "Something wrong:" + err.Error()
+		} else {
+			message = "Delete successfully"
+		}
+	} else {
+		message = "Cannot remove " + key + " coz dont exist in json file"
+	}
+	return message
+}
+
+func (anyDict *Dict) List() []map[string]string {
+	var dataMaps []map[string]string
+	var resultList []map[string]string
+	jsonContent, _ := ioutil.ReadFile(anyDict.filePath)
+	_ = json.Unmarshal(jsonContent, &dataMaps)
+	mapOrder := sortDictByKey(dataMaps)
+	for _, aMap := range mapOrder {
+		resultMap := make(map[string]string)
+		for key, value := range aMap {
+			resultMap[key] = value
+		}
+		resultList = append(resultList, resultMap)
+	}
+	return resultList
+}
+
+func (anyDict *Dict) Update(key, newValue string) string {
+	var message string = ""
+	var data []map[string]string
+	jsonContent, _ := ioutil.ReadFile(anyDict.filePath)
+	isUpdate := false
+	_ = json.Unmarshal(jsonContent, &data)
+	for _, item := range data {
+		if _, ok := item[key]; ok {
+			item[key] = newValue
+			isUpdate = true
+			break
+		}
+	}
+
+	if isUpdate {
+		updatedData, _ := json.MarshalIndent(data, "", "    ")
+		err := ioutil.WriteFile(anyDict.filePath, updatedData, 0644)
+		if err != nil {
+			message = err.Error()
+		} else {
+			message = "update successfully"
+		}
+	} else {
+		message = "cannot update " + key + " coz dont exist in json file"
+	}
+	return message
+}
+
+func (anyDict *Dict) GetHandler(writer http.ResponseWriter, req *http.Request) {
+	word := req.URL.Query().Get("word")
+	result := anyDict.Get(word)
+	writer.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(writer).Encode(map[string]string{"result": result})
+}
+
+func (anyDict *Dict) ListHandler(writer http.ResponseWriter, req *http.Request) {
+	result := anyDict.List()
+	writer.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(writer).Encode(result)
+}
+
+func (anyDict *Dict) RemoveHandler(writer http.ResponseWriter, req *http.Request) {
+	key := req.URL.Query().Get("key")
+	message := anyDict.Remove(key)
+	writer.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(writer).Encode(map[string]string{"result": message})
+}
+
+func (anyDict *Dict) AddHandler(writer http.ResponseWriter, req *http.Request) {
+	var requestData map[string]string
+	body, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		http.Error(writer, "Failed to read request body", http.StatusBadRequest)
 		return
 	}
 
-	response, _ := json.Marshal(d.entries)
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(response)
+	err = json.Unmarshal(body, &requestData)
+	if err != nil {
+		http.Error(writer, "Failed to parse JSON", http.StatusBadRequest)
+		return
+	}
+
+	// Extract key and value from the request data
+	key, keyExists := requestData["key"]
+	value, valueExists := requestData["value"]
+
+	if !keyExists || !valueExists {
+		http.Error(writer, "Key and value are required", http.StatusBadRequest)
+		return
+	}
+
+	message := anyDict.Add(key, value)
+	writer.Header().Set("Content-Type", "application/json")
+	writer.WriteHeader(http.StatusOK)
+	json.NewEncoder(writer).Encode(map[string]string{"message": message})
+}
+
+func (anyDict *Dict) UpdateHanlder(writer http.ResponseWriter, req *http.Request) {
+	var requestData map[string]string
+
+	body, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		http.Error(writer, "Failed to read request body", http.StatusBadRequest)
+		return
+	}
+
+	err = json.Unmarshal(body, &requestData)
+	if err != nil {
+		http.Error(writer, "Failed to parse JSON", http.StatusBadRequest)
+		return
+	}
+
+	key, keyExists := requestData["key"]
+	newValue, valueExists := requestData["newValue"]
+
+	if !keyExists || !valueExists {
+		http.Error(writer, "Key and newValue are required", http.StatusBadRequest)
+		return
+	}
+
+	message := anyDict.Update(key, newValue)
+	writer.Header().Set("Content-Type", "application/json")
+	writer.WriteHeader(http.StatusOK)
+	json.NewEncoder(writer).Encode(map[string]string{"message": message})
 }
